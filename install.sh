@@ -11,15 +11,18 @@
 
 set -eu
 
-# The release stamps these four lines.
-VERSION=0.1.0
-SHA256_ARM64=dc4cbc8893a48a69eb30a05c20f8b55eddfdff9c2abe91139417e16e38396e21
-SHA256_X64=27311580b4655584b453c350cb06dc397fd4483c000f08564410be0d44dcc044
-BASE_URL=https://github.com/Piss-Pour-Software/spotter/releases/download/v$VERSION
+# The release stamps the version and the two checksums.
+VERSION=0.1.1
+SHA256_ARM64=84fbb5fa50edd7cb61cbb381efb7e7460f550054371e80afe3a68ad4a95c0c4d
+SHA256_X64=3088637439d0bd9e02a2edd1b8f24bd0bb9d06147a88b301405f585ca6f7339a
+# Cloudflare first. GitHub keeps every release, and sent this file at 140 KB/s where Cloudflare sent 12 MB/s (2026-11-01).
+BASE_URL=https://spotter.pisspoursoftware.xyz/download/v$VERSION
+FALLBACK_URL=https://github.com/Piss-Pour-Software/spotter/releases/download/v$VERSION
 
 NAME=spotter
 # The phone app the words come from: the TestFlight beta until the App Store page is live.
 APP_LINK=https://testflight.apple.com/join/nUxAwCM6
+APP_HINT="On your Home Screen it is called Scribe for now."
 BIN_DIR="$HOME/.local/bin"
 BIN="$BIN_DIR/$NAME"
 MARK="# added by the $NAME installer"
@@ -50,19 +53,32 @@ expected_sum() {
   esac
 }
 
-# No fixed time limit on a 22 MB file: a slow line is fine. Five seconds under 1 KB/s is a stall, and it fails. A floor
+# No fixed time limit on a 15 MB file: a slow line is fine. Five seconds under 1 KB/s is a stall, and it fails. A floor
 # of 1 B/s would take twice that, because curl measures speed over its last five seconds.
 download() {
-  case "$BASE_URL" in
+  case "$1" in
     https://*) protocol='=https' ;;
     http://127.0.0.1*) protocol='=http' ;;
-    *) fail "downloads go only over https, not $BASE_URL" ;;
+    *) fail "downloads go only over https, not $1" ;;
   esac
   progress=--silent
   if [ -t 2 ]; then progress=--progress-bar; fi
   curl --fail --location "$progress" --show-error --proto "$protocol" --proto-redir "$protocol" \
-    --connect-timeout 5 --speed-limit 1024 --speed-time 5 --output "$2" "$1" ||
-    fail "could not download $1. Check the network and run this again."
+    --connect-timeout 5 --speed-limit 1024 --speed-time 5 --output "$2" "$1"
+}
+
+# Either place can be slow, down or wrong: a file counts only if it matches the checksum in this script.
+fetch_release() {
+  for place in "$BASE_URL" "$FALLBACK_URL"; do
+    if download "$place/$1" "$3"; then
+      got=$(shasum -a 256 "$3" | cut -d ' ' -f 1)
+      if [ "$got" = "$2" ]; then return 0; fi
+      problem="the download's checksum is wrong, so nothing was installed: expected $2, got $got"
+    else
+      problem="could not download $place/$1. Check the network and run this again."
+    fi
+  done
+  fail "$problem"
 }
 
 rc_file() {
@@ -114,6 +130,7 @@ uninstall() {
 
 next_step() {
   say "$NAME follows what Vakyume records on your iPhone. If Vakyume is not on your phone yet: $APP_LINK"
+  say "$APP_HINT"
   say "Next: run $BIN setup"
 }
 
@@ -130,11 +147,11 @@ run_setup() {
 
 install_release() {
   target=$1
-  archive="$NAME-$VERSION-darwin-$target.tar.gz"
-  url="$BASE_URL/$archive"
+  archive="$NAME-$VERSION-darwin-$target.tar.xz"
   want=$(expected_sum "$target")
   if [ "$DRY_RUN" = 1 ]; then
-    say "This would download $url"
+    say "This would download $BASE_URL/$archive,"
+    say "or the same file from $FALLBACK_URL/$archive,"
     say "check it against sha256 $want, install it at $BIN,"
     on_path || say "add $BIN_DIR to your PATH in $(rc_file),"
     say "and start setup. Nothing has changed."
@@ -149,13 +166,9 @@ install_release() {
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT INT TERM
   say "Downloading $archive"
-  download "$url" "$work/$archive"
-  got=$(shasum -a 256 "$work/$archive" | cut -d ' ' -f 1)
-  if [ "$got" != "$want" ]; then
-    fail "the download's checksum is wrong, so nothing was installed: expected $want, got $got"
-  fi
+  fetch_release "$archive" "$want" "$work/$archive"
   mkdir "$work/unpacked"
-  tar -xzf "$work/$archive" -C "$work/unpacked"
+  tar -xf "$work/$archive" -C "$work/unpacked"
   if [ "$("$work/unpacked/$NAME" --version 2>/dev/null || true)" != "$NAME $VERSION" ]; then
     fail "the downloaded program does not run on this Mac, so nothing was installed"
   fi

@@ -281,7 +281,8 @@ export function answerIDs(recordingID: string, lineID: string, text: string): { 
 // ---- Arguments ----
 
 const VALUE_FLAGS = new Set(["recording", "cursor", "cursor-file", "mode", "segment", "agent", "email", "code"]);
-const SWITCHES = new Set(["json", "jsonl", "version", "help"]);
+const SWITCHES = new Set(["json", "jsonl", "version"]);
+const HELP = new Set(["--help", "-h"]);
 
 export interface Arguments {
   command: string;
@@ -289,22 +290,29 @@ export interface Arguments {
   words: string[];
 }
 
+/** Asking for help is never an error: with --help or -h anywhere on the line, what is wrong with the rest does not matter,
+ *  and a flag waiting for its value never takes them for it. */
 export function parseArgs(argv: readonly string[]): Arguments {
-  const flags: Record<string, string | true> = {};
+  const asksForHelp = argv.some((argument) => HELP.has(argument));
+  const flags: Record<string, string | true> = asksForHelp ? { help: true } : {};
   const words: string[] = [];
   let command = "";
   for (let i = 0; i < argv.length; i += 1) {
     const argument = argv[i] ?? "";
+    if (HELP.has(argument)) continue;
     if (argument.startsWith("--")) {
       const name = argument.slice(2);
       if (SWITCHES.has(name)) {
         flags[name] = true;
       } else if (VALUE_FLAGS.has(name)) {
         const value = argv[i + 1];
-        if (value === undefined) throw new Error(`--${name} needs a value`);
+        if (value === undefined || HELP.has(value)) {
+          if (!asksForHelp) throw new Error(`--${name} needs a value`);
+          continue;
+        }
         flags[name] = value;
         i += 1;
-      } else {
+      } else if (!asksForHelp) {
         throw new Error(`unknown option --${name}`);
       }
     } else if (command === "") {
@@ -314,4 +322,26 @@ export function parseArgs(argv: readonly string[]): Arguments {
     }
   }
   return { command, flags, words };
+}
+
+// ---- How this program can be run from here ----
+
+export interface Surroundings {
+  /** $PATH of the shell that ran it. */
+  path: string;
+  execPath: string;
+  home: string;
+  isExecutable: (file: string) => boolean;
+}
+
+/** The words that run this program from here, for everything it tells a person or an agent to run. An installer cannot
+ *  change the PATH of the terminal that started it, and a coding agent's shell may be just as old, so until the program is
+ *  on PATH it names itself by its path. Run from source, the program is node or bun, and the plain name stands. */
+export function runnableName(tool: string, here: Surroundings): string {
+  if (here.path.split(":").some((folder) => folder !== "" && here.isExecutable(`${folder}/${tool}`))) return tool;
+  if (!here.execPath.endsWith(`/${tool}`)) return tool;
+  const fromHome = here.execPath.startsWith(`${here.home}/`) ? here.execPath.slice(here.home.length + 1) : null;
+  const safe = /^[\w./-]+$/;
+  if (fromHome !== null) return safe.test(fromHome) ? `~/${fromHome}` : `"$HOME/${fromHome}"`;
+  return safe.test(here.execPath) ? here.execPath : `"${here.execPath}"`;
 }

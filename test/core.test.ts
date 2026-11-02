@@ -14,6 +14,7 @@ import {
   parseArgs,
   planAnswer,
   roomIDForRecording,
+  runnableName,
   shouldReopen,
   stableUUID,
   takeBatch,
@@ -241,4 +242,47 @@ test("arguments: a command, flags with values, booleans, and the words", () => {
   assert.equal(parseArgs(["watch", "--cursor-file", "/tmp/c"]).flags["cursor-file"], "/tmp/c");
   assert.throws(() => parseArgs(["watch", "--mode"]), /--mode needs a value/);
   assert.throws(() => parseArgs(["watch", "--nonsense"]), /unknown option --nonsense/);
+});
+
+test("--help or -h anywhere asks for that command's help, whatever else the line holds", () => {
+  for (const argv of [["login", "--help"], ["login", "-h"], ["--help", "login"], ["-h", "login"], ["login", "--code", "123456", "--help"]]) {
+    const parsed = parseArgs(argv);
+    assert.equal(parsed.command, "login", argv.join(" "));
+    assert.equal(parsed.flags["help"], true, argv.join(" "));
+  }
+  assert.equal(parseArgs(["--help"]).flags["help"], true);
+  assert.equal(parseArgs(["-h"]).command, "");
+});
+
+test("a flag waiting for its value never swallows --help", () => {
+  const parsed = parseArgs(["reply", "--segment", "--help"]);
+  assert.equal(parsed.command, "reply");
+  assert.equal(parsed.flags["help"], true);
+  assert.equal(parsed.flags["segment"], undefined);
+});
+
+test("asking for help is never an error, whatever else is wrong on the line", () => {
+  assert.equal(parseArgs(["watch", "--nonsense", "--help"]).flags["help"], true);
+  assert.equal(parseArgs(["watch", "--mode", "-h"]).flags["help"], true);
+});
+
+test("a person on a PATH that holds the command is told the plain name", () => {
+  const name = runnableName("spotter", { path: "/usr/bin:/home/a/.local/bin", execPath: "/home/a/.local/bin/spotter", home: "/home/a", isExecutable: (file) => file === "/home/a/.local/bin/spotter" });
+  assert.equal(name, "spotter");
+});
+
+test("right after the installer, the terminal's PATH has not changed yet, so it names the path from the home folder", () => {
+  const name = runnableName("spotter", { path: "/usr/bin:/bin", execPath: "/home/a/.local/bin/spotter", home: "/home/a", isExecutable: () => false });
+  assert.equal(name, "~/.local/bin/spotter");
+});
+
+test("a command outside the home folder is named by its whole path, and a path with a space is quoted", () => {
+  const elsewhere = { path: "/usr/bin", home: "/home/a", isExecutable: () => false };
+  assert.equal(runnableName("spotter", { ...elsewhere, execPath: "/opt/tools/spotter" }), "/opt/tools/spotter");
+  assert.equal(runnableName("spotter", { ...elsewhere, execPath: "/home/a/My Tools/spotter" }), `"$HOME/My Tools/spotter"`);
+});
+
+test("run from source, the program is node or bun, not the command, so the plain name stands", () => {
+  const name = runnableName("spotter", { path: "/usr/bin", execPath: "/opt/homebrew/bin/node", home: "/home/a", isExecutable: () => false });
+  assert.equal(name, "spotter");
 });

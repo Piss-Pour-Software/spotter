@@ -14,15 +14,17 @@ const SCRIPT = fs.readFileSync(new URL("../install.sh", import.meta.url), "utf8"
 const VERSION = "9.9.9";
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "spotter-install-"));
 const files = new Map<string, Buffer>();
-let stalled = false;
+/** The places that take a download and then send nothing, as a dead connection does. */
+const stalled = new Set<string>();
+const asked: string[] = [];
 let server: http.Server;
 let port = 0;
 
 function fakeTool(body: string): Buffer {
   const dir = fs.mkdtempSync(path.join(work, "tool-"));
   fs.writeFileSync(path.join(dir, "spotter"), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
-  const tarball = path.join(dir, "t.tar.gz");
-  execFileSync("tar", ["-czf", tarball, "-C", dir, "spotter"]);
+  const tarball = path.join(dir, "t.tar.xz");
+  execFileSync("tar", ["-cJf", tarball, "-C", dir, "spotter"]);
   return fs.readFileSync(tarball);
 }
 
@@ -33,13 +35,16 @@ function stamp(arm64: Buffer, x64: Buffer, options: { sha?: string } = {}): stri
   return SCRIPT.replace(/^VERSION=.*$/m, `VERSION=${VERSION}`)
     .replace(/^SHA256_ARM64=.*$/m, `SHA256_ARM64=${options.sha ?? sha(arm64)}`)
     .replace(/^SHA256_X64=.*$/m, `SHA256_X64=${options.sha ?? sha(x64)}`)
-    .replace(/^BASE_URL=.*$/m, `BASE_URL=http://127.0.0.1:${port}/release`);
+    .replace(/^BASE_URL=.*$/m, `BASE_URL=http://127.0.0.1:${port}/release`)
+    .replace(/^FALLBACK_URL=.*$/m, `FALLBACK_URL=http://127.0.0.1:${port}/github`);
 }
 
 function publish(arm64: Buffer, x64: Buffer, script = stamp(arm64, x64)): void {
   files.set("/install", Buffer.from(script));
-  files.set(`/release/spotter-${VERSION}-darwin-arm64.tar.gz`, arm64);
-  files.set(`/release/spotter-${VERSION}-darwin-x64.tar.gz`, x64);
+  for (const place of ["release", "github"]) {
+    files.set(`/${place}/spotter-${VERSION}-darwin-arm64.tar.xz`, arm64);
+    files.set(`/${place}/spotter-${VERSION}-darwin-x64.tar.xz`, x64);
+  }
 }
 
 interface Machine {
@@ -82,8 +87,9 @@ const installed = (m: Machine): string => path.join(m.home, ".local/bin/spotter"
 before(async () => {
   server = http.createServer((request, response) => {
     const body = files.get(request.url ?? "");
+    asked.push(request.url ?? "");
     if (!body) return void response.writeHead(404).end();
-    if (stalled && request.url?.endsWith(".tar.gz")) {
+    if (stalled.has((request.url ?? "").split("/")[1] ?? "")) {
       response.writeHead(200, { "content-length": String(body.length) });
       response.write(body.subarray(0, 100)); // and then nothing, as a dead connection does
       return;
@@ -175,14 +181,56 @@ test("a binary that does not run is not installed", async () => {
   assert.equal(fs.existsSync(installed(m)), false);
 });
 
-test("a stalled download stops within seconds and leaves nothing", async () => {
+test("the file comes from the fast place, and GitHub is not asked", async () => {
+  asked.length = 0;
+  const result = await run(machine());
+  assert.equal(result.code, 0, result.out);
+  assert.ok(asked.includes(`/release/spotter-${VERSION}-darwin-arm64.tar.xz`));
+  assert.deepEqual(asked.filter((url) => url.startsWith("/github/")), []);
+});
+
+test("with the fast place gone, the same file comes from GitHub", async () => {
   const m = machine();
-  stalled = true;
+  const name = `/release/spotter-${VERSION}-darwin-arm64.tar.xz`;
+  const whole = files.get(name)!;
+  files.delete(name);
+  const result = await run(m);
+  files.set(name, whole);
+  assert.equal(result.code, 0, result.out);
+  assert.equal(fs.existsSync(installed(m)), true);
+});
+
+test("a fast place that stalls costs five seconds, and GitHub finishes the install", async () => {
+  const m = machine();
+  stalled.add("release");
   const started = Date.now();
   const result = await run(m);
-  stalled = false;
-  assert.equal(result.code, 1, result.out);
+  stalled.clear();
+  assert.equal(result.code, 0, result.out);
   assert.ok(Date.now() - started < 9_000, `took ${Date.now() - started} ms`);
+  assert.equal(fs.existsSync(installed(m)), true);
+});
+
+test("a fast place that sends the wrong bytes is not believed", async () => {
+  const m = machine();
+  const name = `/release/spotter-${VERSION}-darwin-arm64.tar.xz`;
+  const whole = files.get(name)!;
+  files.set(name, fakeTool("exit 9"));
+  const result = await run(m);
+  files.set(name, whole);
+  assert.equal(result.code, 0, result.out);
+  assert.equal(execFileSync(installed(m), ["--version"], { encoding: "utf8" }).trim(), `spotter ${VERSION}`);
+});
+
+test("when neither place sends anything it stops within seconds and leaves nothing", async () => {
+  const m = machine();
+  stalled.add("release");
+  stalled.add("github");
+  const started = Date.now();
+  const result = await run(m);
+  stalled.clear();
+  assert.equal(result.code, 1, result.out);
+  assert.ok(Date.now() - started < 14_000, `took ${Date.now() - started} ms`);
   assert.match(result.out, /could not download/);
   assert.equal(fs.existsSync(installed(m)), false);
 });

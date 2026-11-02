@@ -18,3 +18,5 @@ export const INSTANT_API = "https://api.instantdb.com";
 /** Where a person gets the phone app the words come from: the TestFlight beta until the App Store page is live, then
  *  that page. The page, the README and the installer carry the same link, and a test holds them together. */
 export const APP_LINK = "https://testflight.apple.com/join/nUxAwCM6";
+/** The install page's sentence (scripts/install-page): the phone app's name on the Home Screen until it changes. */
+export const APP_HINT = "On your Home Screen it is called Scribe for now.";

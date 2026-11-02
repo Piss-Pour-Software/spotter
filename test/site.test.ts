@@ -7,8 +7,8 @@ import worker, { respond } from "../site/worker.mjs";
 
 const page = fs.readFileSync(new URL("../site/index.html", import.meta.url), "utf8");
 const source = fs.readFileSync(new URL("../site/worker.mjs", import.meta.url), "utf8");
-const site = { page, styles: ["sha256-abc="] };
-const INSTALL = "https://raw.githubusercontent.com/Piss-Pour-Software/spotter/main/install.sh";
+const INSTALL = "https://raw.githubusercontent.com/Piss-Pour-Software/spotter/v1.2.3/install.sh";
+const site = { page, styles: ["sha256-abc="], install: INSTALL };
 
 test("the root is the page", async () => {
   const response = respond("/", "GET", site);
@@ -25,7 +25,7 @@ test("the page may use only its own styles: no script, no frame, no form, nothin
   assert.equal(respond("/", "GET", site).headers.get("x-content-type-options"), "nosniff");
 });
 
-test("/install points at the script in the public repository, so what runs is what anyone can read", () => {
+test("/install points at the release's script in the public repository, so what runs is what anyone can read", () => {
   const response = respond("/install", "GET", site);
   assert.equal(response.status, 302);
   assert.equal(response.headers.get("location"), INSTALL);
@@ -42,10 +42,13 @@ test("nothing else is served: other paths and other methods are a bare 404", () 
   }
 });
 
-test("the deployed module answers through fetch with the page it was built with", async () => {
+test("a Worker built without a release answers /install with nothing rather than a redirect to nowhere", async () => {
   const response = await worker.fetch(new Request("https://spotter.pisspoursoftware.xyz/install"));
-  assert.equal(response.status, 302);
-  assert.equal(response.headers.get("location"), INSTALL);
+  assert.equal(response.status, 404);
+});
+
+test("the Worker never sees a download: Cloudflare answers those from the release's files, and anything else is a 404", () => {
+  assert.equal(respond("/download/v1.2.3/spotter-1.2.3-darwin-arm64.tar.xz", "GET", site).status, 404);
 });
 
 test("the Worker calls nothing and reads no binding: it reaches none of our machines", () => {

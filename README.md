@@ -6,6 +6,7 @@ Vakyume on your iPhone writes down what is said. `spotter` hands those lines to 
 arrive, and the agent's answers show up in the recording, at the line they belong to.
 
 You need Vakyume on your iPhone first: [join the free beta on TestFlight](https://testflight.apple.com/join/nUxAwCM6).
+On your Home Screen it is called Scribe for now.
 
     curl -fsSL https://spotter.pisspoursoftware.xyz/install | sh
 
@@ -14,7 +15,8 @@ or
     brew install piss-pour-software/tap/spotter
 
 Read [install.sh](install.sh) first if you like: it asks for no password, writes only under your home folder, and checks
-the download against a checksum in the script. To remove the command, its PATH line and your sign-in:
+the download against a checksum in the script, whichever of its two places the download comes from. The line above always
+runs the install.sh of the latest release. To remove the command, its PATH line and your sign-in:
 
     curl -fsSL https://spotter.pisspoursoftware.xyz/install | sh -s -- --uninstall
 
@@ -26,7 +28,9 @@ the download against a checksum in the script. To remove the command, its PATH l
     spotter watch       the lines of your live recording, as they arrive
     spotter reply --segment 42 "Done."
 
-`spotter doctor` is the place to start when something is wrong: each check says what it found and what to do.
+`spotter COMMAND --help` says more about any of them. `spotter doctor` is the place to start when something is wrong: each
+check says what it found and what to do. Until you open a new terminal, the one that ran the installer does not know the
+command yet, so spotter prints its commands with the whole path, `~/.local/bin/spotter guide`, and they work there too.
 
 ## What it reads and where it goes
 
