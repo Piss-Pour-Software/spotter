@@ -1,0 +1,30 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "spotter",
+      "dependencies": {
+        "@instantdb/admin": "0.22.181",
+        "@instantdb/core": "0.22.181",
+      },
+    },
+  },
+  "packages": {
+    "@instantdb/admin": ["@instantdb/admin@0.22.181", "", { "dependencies": { "@instantdb/core": "0.22.181", "@instantdb/version": "0.22.181", "cookie": "^1.1.1", "eventsource": "^4.0.0", "uuid": "^11.1.0" } }, "sha512-lblUjE+HANlTaVCMs9WA2ZvWf6hCCaGeuBOboFjhBHkTljdyXvazi/2uudpREc3EYmhKu10NuvG5iyT7KSLMJQ=="],
+
+    "@instantdb/core": ["@instantdb/core@0.22.181", "", { "dependencies": { "@instantdb/version": "0.22.181", "mutative": "^1.0.10", "uuid": "^11.1.0" } }, "sha512-ptUbw8tbBgPFTfvJeurhxxMkONGzgwogOsO2WDrkqGK0QMA4P5eTxb1Xcm3Nl65qJnie85RrzsmH/AGxtnGaRg=="],
+
+    "@instantdb/version": ["@instantdb/version@0.22.181", "", {}, "sha512-OnK6SjcS+JuhUqF2rg0Ib4Uy3a+MgXGQdfHm3tctQYHI/yA9yG3csegaNcmlMbTbGZLP0Fni2nKCjKt35jwPFA=="],
+
+    "cookie": ["cookie@1.1.1", "", {}, "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ=="],
+
+    "eventsource": ["eventsource@4.1.1", "", { "dependencies": { "eventsource-parser": "^3.0.1" } }, "sha512-D6bTRWh6KahHTK/m4WnjPQyEinNPf9eFLEZSEoj7d6fTibspnAVYfzHvirL7u/aoX5d9YYfIkBVAhmigUELk9w=="],
+
+    "eventsource-parser": ["eventsource-parser@3.1.1", "", {}, "sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ=="],
+
+    "mutative": ["mutative@1.3.0", "", {}, "sha512-8MJj6URmOZAV70dpFe1YnSppRTKC4DsMkXQiBDFayLcDI4ljGokHxmpqaBQuDWa4iAxWaJJ1PS8vAmbntjjKmQ=="],
+
+    "uuid": ["uuid@11.1.1", "", { "bin": { "uuid": "dist/esm/bin/uuid" } }, "sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ=="],
+  }
+}

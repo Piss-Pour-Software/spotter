@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spotter</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 18px/1.5 ui-monospace, Menlo, monospace; max-width: 44rem; margin: 3rem auto; padding: 0 1.25rem; }
+  h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+  pre { padding: 0.75rem 1rem; border: 1px solid currentColor; border-radius: 6px; overflow-x: auto; }
+  li { margin-bottom: 0.5rem; }
+</style>
+</head>
+<body>
+<h1>spotter</h1>
+<p>Vakyume on your iPhone writes down what you say. This hands the words to a coding agent on your Mac as you say them,
+and the agent's answers show up in the recording, at the line they belong to.</p>
+<p>You need Vakyume on your iPhone first: <a href="https://testflight.apple.com/join/nUxAwCM6">join the free beta on TestFlight</a>.</p>
+<h2>Install</h2>
+<pre>curl -fsSL https://spotter.pisspoursoftware.xyz/install | sh</pre>
+<p>or</p>
+<pre>brew install piss-pour-software/tap/spotter</pre>
+<p>It asks for no password and writes only under your home folder. Sign in with the email you use on your phone.</p>
+<h2>What it reads</h2>
+<ul>
+<li>Only your own recordings, with your own sign-in, kept in your Keychain.</li>
+<li>No analytics, and no copy of your words on disk.</li>
+<li>Words reach a model only if you give them to your agent. People near you did not choose that, so tell them it is on.</li>
+</ul>
+<h2>Remove it</h2>
+<pre>curl -fsSL https://spotter.pisspoursoftware.xyz/install | sh -s -- --uninstall</pre>
+</body>
+</html>

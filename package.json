@@ -1,0 +1,17 @@
+{
+  "name": "spotter",
+  "version": "0.1.0",
+  "description": "Follow your own live recording from the terminal, and answer in it.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": { "spotter": "src/cli.ts" },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@instantdb/admin": "0.22.181",
+    "@instantdb/core": "0.22.181"
+  }
+}
