@@ -230,7 +230,8 @@ test("when neither place sends anything it stops within seconds and leaves nothi
   const result = await run(m);
   stalled.clear();
   assert.equal(result.code, 1, result.out);
-  assert.ok(Date.now() - started < 14_000, `took ${Date.now() - started} ms`);
+  // Two 5 s stalls, and room for a Mac under load: 16.5 s at a load of 180.
+  assert.ok(Date.now() - started < 20_000, `took ${Date.now() - started} ms`);
   assert.match(result.out, /could not download/);
   assert.equal(fs.existsSync(installed(m)), false);
 });
@@ -299,6 +300,21 @@ test("an address that is neither https nor this machine is refused", async () =>
   files.set("/install", whole);
   assert.equal(result.code, 1);
   assert.match(result.out, /only over https/);
+});
+
+test("an installed copy is never run from the folder the installer was started in: an old program reads that folder", async () => {
+  const m = machine();
+  const folder = path.join(m.home, "a-cloned-repository");
+  fs.mkdirSync(folder);
+  const asked = path.join(m.home, "ran-in");
+  const tells = fakeTool(`pwd >> "${asked}"\n${healthy}`);
+  publish(tells, tells);
+  const env = environment(m);
+  const once = await capture("/bin/sh", ["-c", `cd "${folder}" && curl -fsSL http://127.0.0.1:${port}/install | sh -s -- --no-setup`], env);
+  assert.equal(once.code, 0, once.out);
+  await capture("/bin/sh", ["-c", `cd "${folder}" && curl -fsSL http://127.0.0.1:${port}/install | sh -s -- --uninstall`], env);
+  publish(fakeTool(healthy), fakeTool(healthy));
+  assert.ok(!fs.readFileSync(asked, "utf8").includes(folder), fs.readFileSync(asked, "utf8"));
 });
 
 test("the script needs no administrator and evaluates nothing", () => {

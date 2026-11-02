@@ -12,9 +12,9 @@
 set -eu
 
 # The release stamps the version and the two checksums.
-VERSION=0.1.1
-SHA256_ARM64=84fbb5fa50edd7cb61cbb381efb7e7460f550054371e80afe3a68ad4a95c0c4d
-SHA256_X64=3088637439d0bd9e02a2edd1b8f24bd0bb9d06147a88b301405f585ca6f7339a
+VERSION=0.1.2
+SHA256_ARM64=630ab26f49b069e8190273b69e0ee3ba6f8fc7a9c40c86eee21417f199d8392e
+SHA256_X64=ee2611e8d0caac64393fdbae45245a6a1c4a28e3c65633d0d9ca3637169dca0e
 # Cloudflare first. GitHub keeps every release, and sent this file at 140 KB/s where Cloudflare sent 12 MB/s (2026-11-01).
 BASE_URL=https://spotter.pisspoursoftware.xyz/download/v$VERSION
 FALLBACK_URL=https://github.com/Piss-Pour-Software/spotter/releases/download/v$VERSION
@@ -45,6 +45,10 @@ detect_target() {
     *) fail "this processor ($(uname -m)) has no build" ;;
   esac
 }
+
+# Asked from the filesystem's root. A copy from before 0.1.2 reads bunfig.toml and .env from the folder it starts in, and the folder this
+# script runs in may be anyone's.
+version_of() { (cd / && "$1" --version 2>/dev/null) || true; }
 
 expected_sum() {
   case "$1" in
@@ -122,7 +126,7 @@ remove_from_path() {
 }
 
 uninstall() {
-  if [ -x "$BIN" ]; then "$BIN" logout >/dev/null 2>&1 || true; fi
+  if [ -x "$BIN" ]; then (cd / && "$BIN" logout >/dev/null 2>&1) || true; fi
   rm -f "$BIN"
   remove_from_path
   say "Removed $NAME and its sign-in from this Mac."
@@ -157,7 +161,7 @@ install_release() {
     say "and start setup. Nothing has changed."
     return
   fi
-  if [ -x "$BIN" ] && [ "$("$BIN" --version 2>/dev/null || true)" = "$NAME $VERSION" ]; then
+  if [ -x "$BIN" ] && [ "$(version_of "$BIN")" = "$NAME $VERSION" ]; then
     say "$NAME $VERSION is already installed at $BIN."
     add_to_path
     run_setup
@@ -169,7 +173,7 @@ install_release() {
   fetch_release "$archive" "$want" "$work/$archive"
   mkdir "$work/unpacked"
   tar -xf "$work/$archive" -C "$work/unpacked"
-  if [ "$("$work/unpacked/$NAME" --version 2>/dev/null || true)" != "$NAME $VERSION" ]; then
+  if [ "$(version_of "$work/unpacked/$NAME")" != "$NAME $VERSION" ]; then
     fail "the downloaded program does not run on this Mac, so nothing was installed"
   fi
   mkdir -p "$BIN_DIR"
