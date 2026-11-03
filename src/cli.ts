@@ -485,17 +485,18 @@ async function downloadModels(args: Arguments): Promise<number> {
 function removeModels(): number {
   const home = realHome();
   const folder = modelsFolder(home);
-  if (sharedWithScribe(folder)) {
-    complain("Scribe for Mac uses these same files, so spotter leaves them. Remove them with Remove Models in Scribe's settings, or keep them: one copy serves both.");
-    return 1;
-  }
-  for (const part of MODEL_PARTS) fs.rmSync(path.join(folder, part.folder), { recursive: true, force: true });
+  // spotter's own files always go: the helper, and the Neural Engine's compiled copies it made (about 40 MB).
   fs.rmSync(path.join(home, "Library", "Application Support", TOOL), { recursive: true, force: true });
-  // And the Neural Engine's compiled copies of them, about 40 MB for each helper that loaded them.
   const caches = path.join(home, "Library", "Caches");
   for (const name of fs.existsSync(caches) ? fs.readdirSync(caches) : []) {
     if (isHelperCache(name)) fs.rmSync(path.join(caches, name), { recursive: true, force: true });
   }
+  // The models themselves only when spotter alone uses them.
+  if (sharedWithScribe(folder)) {
+    say("Removed spotter's speech helper and its compiled copies. Scribe for Mac uses the models themselves, so they stay: Remove Models in Scribe's settings takes them off.");
+    return 0;
+  }
+  for (const part of MODEL_PARTS) fs.rmSync(path.join(folder, part.folder), { recursive: true, force: true });
   say("Removed Scribe's speech models and spotter's speech helper from this Mac.");
   return 0;
 }

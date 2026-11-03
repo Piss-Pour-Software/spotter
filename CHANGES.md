@@ -2,6 +2,12 @@
 
 What each release lets you do, newest first. Releases before 0.2.0 are on GitHub.
 
+## 0.2.2
+
+See: on a Mac with Scribe for Mac, `spotter models remove` now takes spotter's own helper and its compiled copies, and
+leaves the models Scribe for Mac uses. Before, it removed nothing there.
+Try: `spotter models remove` on a Mac with Scribe for Mac. You should see that spotter's files went and the models stayed.
+
 ## 0.2.1
 
 See: `spotter models remove` now also takes the Neural Engine's compiled copies of the models (about 40 MB, in

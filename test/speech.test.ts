@@ -160,11 +160,18 @@ test("models says where they are, and that Scribe for Mac shares them when it do
 });
 
 test("remove takes the models and the helper off, and leaves them when Scribe for Mac uses them", async () => {
+  // Scribe for Mac's models stay; spotter's own helper and its compiled copies go.
   const shared = home({ models: true, shared: true });
-  const refused = await run(shared, ["models", "remove"]);
-  assert.equal(refused.code, 1);
-  assert.match(refused.err, /Scribe for Mac uses these same files/);
+  const sharedHelper = path.join(shared.home, "Library", "Application Support", "spotter");
+  fs.mkdirSync(sharedHelper, { recursive: true });
+  fs.writeFileSync(path.join(sharedHelper, "spotter-speech"), "helper");
+  fs.mkdirSync(path.join(shared.home, "Library", "Caches", "spotter-speech"), { recursive: true });
+  const cleared = await run(shared, ["models", "remove"]);
+  assert.equal(cleared.code, 0, cleared.err);
+  assert.match(cleared.out, /Scribe for Mac uses the models themselves, so they stay/);
   assert.ok(fs.existsSync(path.join(shared.models, "parakeet-ultra")));
+  assert.equal(fs.existsSync(sharedHelper), false);
+  assert.equal(fs.existsSync(path.join(shared.home, "Library", "Caches", "spotter-speech")), false);
 
   const mine = home({ models: true });
   fs.mkdirSync(path.join(mine.models, "parakeet-ctc-110m-coreml"), { recursive: true });

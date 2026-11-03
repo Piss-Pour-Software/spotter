@@ -68,7 +68,7 @@ export const COMMANDS: Readonly<Record<string, Page>> = {
     options: [
       ["status", "the default: where they are and their size, or what a download needs"],
       ["download", `download them (${megabytes(MODELS_BYTES)}, once), prepare them, and try them on a spoken sample`],
-      ["remove", "remove them, unless Scribe for Mac uses the same files"],
+      ["remove", "remove them and spotter's helper; models Scribe for Mac also uses stay"],
       ["--json", "the speech helper's own lines, one JSON object each"],
     ],
   },
