@@ -45,7 +45,7 @@ or later. A download that is cut continues where it stopped. The first time, the
 
 They live where Scribe for Mac keeps the same models, `~/Library/Application Support/OnDeviceTranscription/models`, so a
 Mac that has Scribe for Mac downloads nothing, and the two share one copy. `spotter models remove` takes them off again,
-unless Scribe for Mac uses them.
+with the Neural Engine's compiled copies macOS keeps in `~/Library/Caches`, unless Scribe for Mac uses them.
 
 The program that runs them, `spotter-speech`, is built from Scribe's speech engine and
 [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache License 2.0). spotter fetches it from its release the

@@ -2,6 +2,15 @@
 
 What each release lets you do, newest first. Releases before 0.2.0 are on GitHub.
 
+## 0.2.1
+
+See: `spotter models remove` now also takes the Neural Engine's compiled copies of the models (about 40 MB, in
+`~/Library/Caches`).
+See: from this release on, an update that brings the same speech helper keeps the models' compiled copies, so the first
+file after it starts at once; an update with a changed helper prepares the models again, once.
+See: when the Mac's voice cannot make the spoken sample in time, the download says the test was skipped.
+Try: `spotter models remove`, then `du -sh ~/Library/Caches/spotter-speech*`. You should see nothing left.
+
 ## 0.2.0
 
 See: `spotter setup` now offers Scribe's own speech models for this Mac: 832 MB, downloaded once, with one line that

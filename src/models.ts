@@ -38,7 +38,6 @@ export function modelsFolder(home: string): string {
   return `${home}/Library/Application Support/OnDeviceTranscription/models`;
 }
 
-/** Where spotter keeps the helper, one file per version, so a new spotter fetches the helper it was released with. */
 /** The three parts in the models folder: the folder each has (what removal takes), the path that is there once it is
  *  installed, and its name in a sentence. */
 export const MODEL_PARTS: ReadonlyArray<{ folder: string; installed: string; title: string }> = [
@@ -54,8 +53,23 @@ export function modelsOnDisk(folder: string, exists: (file: string) => boolean):
   return { complete: missing.length === 0, missing };
 }
 
-export function helperPath(home: string, version: string): string {
-  return `${home}/Library/Application Support/spotter/spotter-speech-${version}`;
+/** Where spotter keeps the helper: one name across releases. macOS keeps the Neural Engine's compiled copies of the models
+ *  under the program's name and identity: the same program finds them again (0.8 s), a changed one compiles them again
+ *  (119.5 s; both measured on a Mac at load 400, #1621). A release that brings the same helper bytes, which the same build
+ *  always gives, so costs no compile. `spotter-speech.sha256` beside it says which release's archive it came from. */
+export function helperPath(home: string): string {
+  return `${home}/Library/Application Support/spotter/spotter-speech`;
+}
+
+/** The Neural Engine's compiled copies of the models, which macOS keeps in ~/Library/Caches under the name of the program
+ *  that loaded them (about 40 MB): `spotter-speech`, and `spotter-speech-0.2.0` from the one release that named it by version. */
+export function isHelperCache(name: string): boolean {
+  return name === "spotter-speech" || name.startsWith("spotter-speech-");
+}
+
+/** A compiled copy left by 0.2.0's helper, which named itself by version; nothing reads it now. */
+export function isStaleHelperCache(name: string): boolean {
+  return name.startsWith("spotter-speech-");
 }
 
 export function helperArchive(version: string): string {

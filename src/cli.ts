@@ -28,7 +28,7 @@ import {
   type Row,
 } from "./core.ts";
 import { commandHelp, guide, usage } from "./help.ts";
-import { fixFor, formatSpeechLine, megabytes, MODEL_PARTS, MODELS_BYTES, modelsFolder, modelsOnDisk, progressLine, speechSupport, statusText, steady, wantsModels, type SpeechEvent } from "./models.ts";
+import { fixFor, formatSpeechLine, isHelperCache, megabytes, MODEL_PARTS, MODELS_BYTES, modelsFolder, modelsOnDisk, progressLine, speechSupport, statusText, steady, wantsModels, type SpeechEvent } from "./models.ts";
 import { freeBytes, helper, logsFolder, platform, run as runSpeech, sharedWithScribe, spokenSample } from "./speech.ts";
 import { describe, existingAnswer, followLines, followRecordings, followTyped, listRecordings, openLive, readLine, Refused, sendCode, verifyCode, write, type Live } from "./instant.ts";
 import { deleteCredential, readCredential, writeCredential, type Credential } from "./keychain.ts";
@@ -472,6 +472,8 @@ async function downloadModels(args: Arguments): Promise<number> {
       });
       if (proof.code !== 0) return failed(proof, "transcribe");
       if (!json) say(`Tried on a spoken sample, it heard: "${heard.join(" ")}"`);
+    } else if (!json) {
+      say("No spoken test: the Mac's voice did not make a sample within 5 s. The models are ready all the same.");
     }
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
@@ -489,6 +491,11 @@ function removeModels(): number {
   }
   for (const part of MODEL_PARTS) fs.rmSync(path.join(folder, part.folder), { recursive: true, force: true });
   fs.rmSync(path.join(home, "Library", "Application Support", TOOL), { recursive: true, force: true });
+  // And the Neural Engine's compiled copies of them, about 40 MB for each helper that loaded them.
+  const caches = path.join(home, "Library", "Caches");
+  for (const name of fs.existsSync(caches) ? fs.readdirSync(caches) : []) {
+    if (isHelperCache(name)) fs.rmSync(path.join(caches, name), { recursive: true, force: true });
+  }
   say("Removed Scribe's speech models and spotter's speech helper from this Mac.");
   return 0;
 }

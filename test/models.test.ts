@@ -10,6 +10,8 @@ import {
   helperArchive,
   helperPath,
   helperURLs,
+  isHelperCache,
+  isStaleHelperCache,
   megabytes,
   modelsFolder,
   modelsOnDisk,
@@ -45,8 +47,10 @@ test("the models live where Scribe for Mac keeps them, so a Mac that has them do
   assert.equal(modelsFolder("/home-of-someone"), "/home-of-someone/Library/Application Support/OnDeviceTranscription/models");
 });
 
-test("the helper is kept per version, and comes from the release: Cloudflare first, then GitHub", () => {
-  assert.equal(helperPath("/home-of-someone", "0.2.0"), "/home-of-someone/Library/Application Support/spotter/spotter-speech-0.2.0");
+test("the helper keeps one name, and comes from the release: Cloudflare first, then GitHub", () => {
+  // One name across versions: macOS keeps the Neural Engine's compiled copies under the program's name, so an upgrade
+  // keeps them; the checksum beside it says which release it came from.
+  assert.equal(helperPath("/home-of-someone"), "/home-of-someone/Library/Application Support/spotter/spotter-speech");
   assert.equal(helperArchive("0.2.0"), "spotter-speech-0.2.0-darwin-arm64.tar.xz");
   assert.deepEqual(helperURLs("0.2.0"), [
     "https://spotter.pisspoursoftware.xyz/download/v0.2.0/spotter-speech-0.2.0-darwin-arm64.tar.xz",
@@ -138,4 +142,14 @@ test("the shown fraction is the highest yet, and its bytes follow it", () => {
   const event = { event: "progress", part: "words", title: "Parakeet Ultra, the words", fraction: 0.37, bytesDone: 307_840_000, bytesTotal: 832_000_000, compiling: false } as const;
   assert.deepEqual(steady(0.75, event), { ...event, fraction: 0.75, bytesDone: 624_000_000 });
   assert.deepEqual(steady(0.2, event), { ...event, fraction: 0.37, bytesDone: 307_840_000 });
+});
+
+test("the helper's compiled copies are known by name, and an older version's are stale", () => {
+  assert.equal(isHelperCache("spotter-speech-0.2.0"), true);
+  assert.equal(isHelperCache("spotter-speech"), true);
+  assert.equal(isHelperCache("spotter"), false);
+  assert.equal(isHelperCache("com.apple.Safari"), false);
+  // 0.2.0 named the helper, and so its compiled copies, by version; those are stale now.
+  assert.equal(isStaleHelperCache("spotter-speech-0.2.0"), true);
+  assert.equal(isStaleHelperCache("spotter-speech"), false);
 });

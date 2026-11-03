@@ -137,7 +137,10 @@ test("models download downloads, prepares, tries a spoken sample, and says what 
       transcribe: ['{"event":"loaded","loadSeconds":0.4,"speakerLabels":false}', '{"event":"line","start":0.1,"end":2,"speaker":null,"text":"Spotter is ready to write down what you say."}'],
     },
   });
-  const result = await run(at, ["models", "download"]);
+  // The sample is the test's own: `say` can take more than its 5 s on a loaded Mac.
+  const sample = path.join(at.home, "sample.aiff");
+  fs.writeFileSync(sample, "audio");
+  const result = await run(at, ["models", "download"], { SPOTTER_SAMPLE: sample });
   assert.equal(result.code, 0, result.err);
   assert.match(result.out, /Downloading Scribe's speech models \(832 MB\) from Hugging Face into .*OnDeviceTranscription\/models\./);
   assert.match(result.out, /Prepared in 48 s\./);
@@ -255,7 +258,8 @@ test("the first transcribe fetches the release's helper, checks it, keeps it wit
     assert.equal(result.out, "+0:01 Fetched.\n");
   });
   const kept = path.join(fs.realpathSync(at.home), "Library", "Application Support", "spotter");
-  assert.deepEqual(fs.readdirSync(kept).sort(), ["licenses", "spotter-speech-0.1.0"]);
+  assert.deepEqual(fs.readdirSync(kept).sort(), ["licenses", "spotter-speech", "spotter-speech.sha256"]);
+  assert.equal(fs.readFileSync(path.join(kept, "spotter-speech.sha256"), "utf8").trim(), sha);
   assert.equal(fs.readFileSync(path.join(kept, "licenses", "FluidAudio-LICENSE"), "utf8"), "Apache License\n");
 });
 
@@ -269,7 +273,7 @@ test("a helper whose bytes do not match the release's checksum is never kept or 
     assert.equal(result.code, 1);
     assert.match(result.err, /checksum is wrong/);
   });
-  assert.equal(fs.existsSync(path.join(fs.realpathSync(at.home), "Library", "Application Support", "spotter", "spotter-speech-0.1.0")), false);
+  assert.equal(fs.existsSync(path.join(fs.realpathSync(at.home), "Library", "Application Support", "spotter", "spotter-speech")), false);
 });
 
 test("a place that stalls costs 5 s, and the second place brings the helper", async () => {
@@ -293,4 +297,66 @@ test("a release place that is neither https nor this Mac is refused", async () =
   const result = await run(at, ["transcribe", audio], { SPOTTER_SPEECH_RELEASES: "http://example.com/release", SPOTTER_SPEECH_SHA256: "0".repeat(64), SPOTTER_SPEECH: "" });
   assert.equal(result.code, 1);
   assert.match(result.err, /only over https/);
+});
+
+test("remove also takes the Neural Engine's compiled copies, which macOS keeps in Caches under the helper's name", async () => {
+  const mine = home({ models: true });
+  const caches = path.join(mine.home, "Library", "Caches");
+  for (const name of ["spotter-speech-0.2.0", "spotter-speech-0.1.9", "spotter-speech", "com.example.other"]) {
+    fs.mkdirSync(path.join(caches, name, "com.apple.e5rt.e5bundlecache"), { recursive: true });
+  }
+  const removed = await run(mine, ["models", "remove"]);
+  assert.equal(removed.code, 0, removed.err);
+  assert.deepEqual(fs.readdirSync(caches), ["com.example.other"]);
+});
+
+test("a newer helper replaces the old one under the same name, keeps its compiled copies, and drops 0.2.0's", async () => {
+  const at = home({ models: true });
+  const real = fs.realpathSync(at.home);
+  const caches = path.join(real, "Library", "Caches");
+  fs.mkdirSync(path.join(caches, "spotter-speech-0.2.0"), { recursive: true });
+  fs.mkdirSync(path.join(caches, "spotter-speech"), { recursive: true });
+  // The helper of an earlier release: its checksum is not this release's.
+  const kept = path.join(real, "Library", "Application Support", "spotter");
+  fs.mkdirSync(kept, { recursive: true });
+  fs.writeFileSync(path.join(kept, "spotter-speech"), "#!/bin/sh\necho old\n", { mode: 0o755 });
+  fs.writeFileSync(path.join(kept, "spotter-speech.sha256"), `${"1".repeat(64)}\n`);
+  fs.writeFileSync(path.join(kept, "spotter-speech-0.2.0"), "old", { mode: 0o755 });
+  const audio = path.join(at.home, "a.wav");
+  fs.writeFileSync(audio, "audio");
+  const { bytes, sha } = helperArchive(`#!/bin/sh\ncase "$1" in version) echo '${VERSION_LINE}';; transcribe) echo '{"event":"line","start":0,"end":1,"speaker":0,"text":"New."}';; esac\n`);
+  await serving({ "/fast/v0.1.0/spotter-speech-0.1.0-darwin-arm64.tar.xz": bytes }, async (base) => {
+    const result = await run(at, ["transcribe", audio], { ...fetchEnv(at, base, sha), SPOTTER_SPEECH: "" });
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /New\./);
+  });
+  assert.deepEqual(fs.readdirSync(caches), ["spotter-speech"]);
+  assert.deepEqual(fs.readdirSync(kept).sort(), ["licenses", "spotter-speech", "spotter-speech.sha256"]);
+});
+
+test("the helper already kept for this release is used as it is, with nothing fetched", async () => {
+  const at = home({ models: true });
+  const kept = path.join(fs.realpathSync(at.home), "Library", "Application Support", "spotter");
+  fs.mkdirSync(kept, { recursive: true });
+  fs.writeFileSync(path.join(kept, "spotter-speech"), `#!/bin/sh\ncase "$1" in transcribe) echo '{"event":"line","start":0,"end":1,"speaker":0,"text":"Kept."}';; esac\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(kept, "spotter-speech.sha256"), `${"2".repeat(64)}\n`);
+  const audio = path.join(at.home, "a.wav");
+  fs.writeFileSync(audio, "audio");
+  // No release place answers: anything fetched would fail.
+  const result = await run(at, ["transcribe", audio], { SPOTTER_SPEECH_RELEASES: "http://127.0.0.1:9/none", SPOTTER_SPEECH_SHA256: "2".repeat(64), SPOTTER_SPEECH: "" });
+  assert.equal(result.code, 0, result.err);
+  assert.match(result.out, /Kept\./);
+});
+
+test("when the Mac's voice cannot make the spoken sample, the download says the test was skipped and why", async () => {
+  const at = home({
+    lines: {
+      status: ['{"event":"status","folder":"x","complete":true,"missing":[],"bytesToDownload":0,"bytesOnDisk":794000000}'],
+      prepare: ['{"event":"prepared","loadSeconds":1,"speakerLabels":true}'],
+    },
+  });
+  const result = await run(at, ["models", "download"], { SPOTTER_SAMPLE: path.join(at.home, "no-such-sample.aiff") });
+  assert.equal(result.code, 0, result.err);
+  assert.match(result.out, /No spoken test: the Mac's voice did not make a sample within 5 s\. The models are ready all the same\./);
+  assert.match(result.out, /Ready\./);
 });

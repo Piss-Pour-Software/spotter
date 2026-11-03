@@ -12,9 +12,9 @@
 set -eu
 
 # The release stamps the version and the two checksums.
-VERSION=0.2.0
-SHA256_ARM64=499fd5a3f2a324c4021c5351b36bf32e0905cfdbfe512fed4d22e9b1a28b8866
-SHA256_X64=8b60249f8ae06aae7d1ae24f02cd8f5fd9d8ced16bb7a6ebb83a9f6a1f8ab98b
+VERSION=0.2.1
+SHA256_ARM64=c332388627a287cd64e4c3d857af12268a37d688e05c2b733090c16eff491bca
+SHA256_X64=cdeeaa3e8bc37dd4d6e5fce061d1af4999d3fa81df69c45d1b319ba0a0c2e79d
 # Cloudflare first. GitHub keeps every release, and sent this file at 140 KB/s where Cloudflare sent 12 MB/s (2026-11-01).
 BASE_URL=https://spotter.pisspoursoftware.xyz/download/v$VERSION
 FALLBACK_URL=https://github.com/Piss-Pour-Software/spotter/releases/download/v$VERSION

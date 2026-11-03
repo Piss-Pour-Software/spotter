@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
-import { helperArchive, helperPath, helperURLs, parseEvent, type Platform, type SpeechEvent } from "./models.ts";
+import { helperArchive, helperPath, helperURLs, isStaleHelperCache, parseEvent, type Platform, type SpeechEvent } from "./models.ts";
 import { setting } from "./names.ts";
 import { SPEECH_SHA256 } from "./release.ts";
 
@@ -60,10 +60,11 @@ export interface FetchProgress {
 export async function helper(home: string, version: string, progress: FetchProgress): Promise<string> {
   const given = setting("SPEECH");
   if (given) return given;
-  const target = helperPath(home, version);
-  if (fs.existsSync(target)) return target;
+  const target = helperPath(home);
+  const stamp = `${target}.sha256`;
   // Tests serve a release of their own: SPOTTER_SPEECH_RELEASES (places, comma-separated) and SPOTTER_SPEECH_SHA256.
   const expected = setting("SPEECH_SHA256") ?? SPEECH_SHA256;
+  if (expected !== "unset" && fs.existsSync(target) && readStamp(stamp) === expected) return target;
   const places = setting("SPEECH_RELEASES")?.split(",").map((base) => `${base}/v${version}/${helperArchive(version)}`) ?? helperURLs(version);
   if (expected === "unset") {
     throw new Error("this copy of spotter was not built as a release, so it has no speech helper to fetch: set SPOTTER_SPEECH to a spotter-speech built from the source");
@@ -94,20 +95,35 @@ export async function helper(home: string, version: string, progress: FetchProgr
     fs.chmodSync(unpacked, 0o755);
     const said = versionOf(unpacked);
     if (said?.protocol !== SPEECH_PROTOCOL) throw new Error("the downloaded speech helper does not run on this Mac, so nothing was kept");
-    // Renamed into place, so a half-written helper is never run; a helper for another version is not kept.
+    // Renamed into place, so a half-written helper is never run; the stamp follows, so a cut between them fetches again.
     fs.renameSync(unpacked, target);
+    fs.writeFileSync(stamp, `${expected}\n`);
     // Its licenses (FluidAudio's Apache License and those it carries) stay beside it.
     const licenses = path.join(work, "licenses");
     if (fs.existsSync(licenses)) {
       fs.rmSync(path.join(folder, "licenses"), { recursive: true, force: true });
       fs.renameSync(licenses, path.join(folder, "licenses"));
     }
+    // 0.2.0 kept its helper, and macOS its compiled copies, under a versioned name: nothing reads those now.
     for (const name of fs.readdirSync(folder)) {
-      if (name.startsWith("spotter-speech-") && path.join(folder, name) !== target) fs.rmSync(path.join(folder, name), { force: true });
+      if (name.startsWith("spotter-speech-")) fs.rmSync(path.join(folder, name), { force: true });
+    }
+    const caches = path.join(home, "Library", "Caches");
+    for (const name of fs.existsSync(caches) ? fs.readdirSync(caches) : []) {
+      if (isStaleHelperCache(name)) fs.rmSync(path.join(caches, name), { recursive: true, force: true });
     }
     return target;
   } finally {
     fs.rmSync(work, { recursive: true, force: true });
+  }
+}
+
+/** The checksum of the archive the kept helper came from, or "" when there is none. */
+function readStamp(file: string): string {
+  try {
+    return fs.readFileSync(file, "utf8").trim();
+  } catch {
+    return "";
   }
 }
 
@@ -185,8 +201,11 @@ export function run(file: string, args: string[], onEvent: (event: SpeechEvent) 
   });
 }
 
-/** A short spoken sample for the first proof, in the Mac's own voice: `say` is on every Mac and needs no network. */
+/** A short spoken sample for the first proof, in the Mac's own voice: `say` is on every Mac and needs no network. Tests
+ *  give their own (SPOTTER_SAMPLE). */
 export function spokenSample(folder: string, words: string): string | null {
+  const given = setting("SAMPLE");
+  if (given) return fs.existsSync(given) ? given : null;
   const file = path.join(folder, "spotter-sample.aiff");
   try {
     // A sentence takes `say` about a second; past 5 s the proof is skipped, never the models.
