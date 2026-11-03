@@ -15,6 +15,10 @@ export const setting = (name: string): string | undefined => process.env[`${TOOL
 export const APP_ID = setting("INSTANT_APP_ID") || "e7c49961-d702-46a1-82c1-fca9a61f6a4d";
 export const INSTANT_API = "https://api.instantdb.com";
 
+/** The tool's site, which serves the release's files, and the public repository whose releases keep every one of them. */
+export const SITE = `${TOOL}.pisspoursoftware.xyz`;
+export const PUBLIC_REPO = `Piss-Pour-Software/${TOOL}`;
+
 /** Where a person gets the phone app the words come from: the TestFlight beta until the App Store page is live, then
  *  that page. The page, the README and the installer carry the same link, and a test holds them together. */
 export const APP_LINK = "https://testflight.apple.com/join/nUxAwCM6";

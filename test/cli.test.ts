@@ -10,7 +10,7 @@ import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
-const COMMANDS = ["setup", "login", "logout", "doctor", "list", "watch", "reply", "guide"];
+const COMMANDS = ["setup", "login", "logout", "doctor", "list", "watch", "reply", "models", "transcribe", "guide"];
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "spotter-cli-"));
 const calls = path.join(work, "security-calls");
 fs.writeFileSync(path.join(work, "security"), `#!/bin/sh\necho "$*" >> "${calls}"\nexit 44\n`, { mode: 0o755 });

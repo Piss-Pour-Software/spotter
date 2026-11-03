@@ -16,6 +16,8 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), "spotter-install-"));
 const files = new Map<string, Buffer>();
 /** The places that take a download and then send nothing, as a dead connection does. */
 const stalled = new Set<string>();
+/** The places that send a download slowly, over about two seconds, as a slow link does (#1600). */
+const slow = new Set<string>();
 const asked: string[] = [];
 let server: http.Server;
 let port = 0;
@@ -28,7 +30,7 @@ function fakeTool(body: string): Buffer {
   return fs.readFileSync(tarball);
 }
 
-const healthy = `case "$1" in --version) echo "spotter ${VERSION}";; setup) echo "setup ran";; logout) echo "signed out" >> "$HOME/logout-ran";; esac`;
+const healthy = `case "$1" in --version) echo "spotter ${VERSION}";; setup) echo "setup ran";; logout) echo "signed out" >> "$HOME/logout-ran";; models) echo "$2" >> "$HOME/models-ran";; esac`;
 const sha = (data: Buffer): string => createHash("sha256").update(data).digest("hex");
 
 function stamp(arm64: Buffer, x64: Buffer, options: { sha?: string } = {}): string {
@@ -89,6 +91,18 @@ before(async () => {
     const body = files.get(request.url ?? "");
     asked.push(request.url ?? "");
     if (!body) return void response.writeHead(404).end();
+    if (slow.has((request.url ?? "").split("/")[1] ?? "")) {
+      response.writeHead(200, { "content-length": String(body.length) });
+      const step = Math.ceil(body.length / 8);
+      let at = 0;
+      const send = (): void => {
+        response.write(body.subarray(at, at + step));
+        at += step;
+        if (at < body.length) setTimeout(send, 300);
+        else response.end();
+      };
+      return send();
+    }
     if (stalled.has((request.url ?? "").split("/")[1] ?? "")) {
       response.writeHead(200, { "content-length": String(body.length) });
       response.write(body.subarray(0, 100)); // and then nothing, as a dead connection does
@@ -282,6 +296,36 @@ test("uninstall signs out first and removes the command", async () => {
   assert.equal(result.code, 0, result.out);
   assert.equal(fs.existsSync(installed(m)), false);
   assert.equal(fs.existsSync(path.join(m.home, "logout-ran")), true);
+});
+
+test("uninstall takes the speech models and their helper off too, through the command itself (#1621)", async () => {
+  const m = machine();
+  await run(m);
+  const result = await run(m, "--uninstall");
+  assert.equal(result.code, 0, result.out);
+  assert.equal(fs.readFileSync(path.join(m.home, "models-ran"), "utf8"), "remove\n");
+  assert.match(result.out, /speech models/);
+});
+
+// #1600: a 25 MB download at GitHub's 140 KB/s took 2.5 minutes with no sign of life, so a person watching sees curl's
+// progress bar; an agent or a pipe gets none of it.
+test("a person at a terminal sees the download move (#1600)", async () => {
+  const m = machine();
+  slow.add("release");
+  try {
+    const inner = `curl -fsSL http://127.0.0.1:${port}/install | sh -s -- --no-setup`;
+    const result = await capture("/usr/bin/script", ["-q", "/dev/null", "/bin/sh", "-c", inner], environment(m));
+    assert.match(result.out, /#+\s*\d+\.\d%/, result.out);
+    assert.match(result.out, /Installed spotter/);
+  } finally {
+    slow.delete("release");
+  }
+});
+
+test("an install through a pipe, as an agent runs it, prints no progress bar (#1600)", async () => {
+  const result = await run(machine());
+  assert.equal(result.code, 0, result.out);
+  assert.doesNotMatch(result.out, /\d+\.\d%/);
 });
 
 test("with a terminal, the install goes straight into setup", async () => {

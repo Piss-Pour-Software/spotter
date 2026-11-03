@@ -44,7 +44,7 @@ function clock(ms: number | null): string {
   return ms === null ? "--:--:--" : new Date(ms).toTimeString().slice(0, 8);
 }
 
-function offset(seconds: number): string {
+export function offset(seconds: number): string {
   const whole = Math.floor(seconds);
   const [h, m, s] = [Math.floor(whole / 3600), Math.floor((whole % 3600) / 60), whole % 60];
   const pad = (n: number): string => String(n).padStart(2, "0");
@@ -280,8 +280,8 @@ export function answerIDs(recordingID: string, lineID: string, text: string): { 
 
 // ---- Arguments ----
 
-const VALUE_FLAGS = new Set(["recording", "cursor", "cursor-file", "mode", "segment", "agent", "email", "code"]);
-const SWITCHES = new Set(["json", "jsonl", "version"]);
+const VALUE_FLAGS = new Set(["recording", "cursor", "cursor-file", "mode", "segment", "agent", "email", "code", "language"]);
+const SWITCHES = new Set(["json", "jsonl", "version", "models", "no-models", "no-speakers"]);
 const HELP = new Set(["--help", "-h"]);
 
 export interface Arguments {

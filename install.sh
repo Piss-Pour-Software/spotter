@@ -5,16 +5,16 @@
 #   curl -fsSL https://spotter.pisspoursoftware.xyz/install | sh -s -- --dry-run
 #   curl -fsSL https://spotter.pisspoursoftware.xyz/install | sh -s -- --uninstall
 #
-# Options: --dry-run, --uninstall, --no-setup, --no-modify-path.
+# Options: --dry-run, --uninstall (the command, its PATH line, its sign-in and its speech models), --no-setup, --no-modify-path.
 #
 # Everything happens from main, on the last line, so a download cut short runs nothing.
 
 set -eu
 
 # The release stamps the version and the two checksums.
-VERSION=0.1.2
-SHA256_ARM64=630ab26f49b069e8190273b69e0ee3ba6f8fc7a9c40c86eee21417f199d8392e
-SHA256_X64=ee2611e8d0caac64393fdbae45245a6a1c4a28e3c65633d0d9ca3637169dca0e
+VERSION=0.2.0
+SHA256_ARM64=499fd5a3f2a324c4021c5351b36bf32e0905cfdbfe512fed4d22e9b1a28b8866
+SHA256_X64=8b60249f8ae06aae7d1ae24f02cd8f5fd9d8ced16bb7a6ebb83a9f6a1f8ab98b
 # Cloudflare first. GitHub keeps every release, and sent this file at 140 KB/s where Cloudflare sent 12 MB/s (2026-11-01).
 BASE_URL=https://spotter.pisspoursoftware.xyz/download/v$VERSION
 FALLBACK_URL=https://github.com/Piss-Pour-Software/spotter/releases/download/v$VERSION
@@ -126,10 +126,15 @@ remove_from_path() {
 }
 
 uninstall() {
-  if [ -x "$BIN" ]; then (cd / && "$BIN" logout >/dev/null 2>&1) || true; fi
+  if [ -x "$BIN" ]; then
+    (cd / && "$BIN" logout >/dev/null 2>&1) || true
+    # The speech models and their helper (#1621), by spotter itself, which leaves them when Scribe for Mac uses the same
+    # files. A copy from before 0.2.0 has no models command.
+    if (cd / && "$BIN" help models >/dev/null 2>&1); then (cd / && "$BIN" models remove) || true; fi
+  fi
   rm -f "$BIN"
   remove_from_path
-  say "Removed $NAME and its sign-in from this Mac."
+  say "Removed $NAME and its sign-in from this Mac, and the speech models it downloaded."
 }
 
 next_step() {
